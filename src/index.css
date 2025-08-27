@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mada Brew Boss - Design System for Madagascar Beverage Wholesale Management
+All colors MUST be HSL - Madagascar inspired palette with warm tropical tones
+*/
+
+@layer base {
+  :root {
+    /* Core Madagascar-inspired palette */
+    --background: 45 15% 97%;
+    --foreground: 25 25% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 25 25% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 25 25% 12%;
+
+    /* Madagascar flag colors - Red as primary */
+    --primary: 4 85% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 4 85% 68%;
+
+    /* Green accent from flag */
+    --secondary: 155 65% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Warm beverage tones */
+    --muted: 45 25% 95%;
+    --muted-foreground: 25 15% 45%;
+
+    --accent: 35 85% 65%;
+    --accent-foreground: 25 25% 12%;
+
+    /* Tropical amber/gold */
+    --amber: 45 95% 55%;
+    --amber-foreground: 25 25% 12%;
+
+    /* Rum brown */
+    --brown: 25 65% 35%;
+    --brown-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 45 25% 88%;
+    --input: 45 25% 92%;
+    --ring: 4 85% 58%;
+
+    /* Custom beverage gradients */
+    --gradient-tropical: linear-gradient(135deg, hsl(4 85% 58%), hsl(35 85% 65%));
+    --gradient-amber: linear-gradient(135deg, hsl(45 95% 55%), hsl(35 85% 65%));
+    --gradient-success: linear-gradient(135deg, hsl(155 65% 45%), hsl(155 65% 55%));
+    
+    /* Shadows with brand colors */
+    --shadow-primary: 0 10px 30px -10px hsl(4 85% 58% / 0.3);
+    --shadow-ambient: 0 4px 20px -4px hsl(25 25% 12% / 0.1);
+    --shadow-glow: 0 0 40px hsl(35 85% 65% / 0.4);
+
+    /* Smooth transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
