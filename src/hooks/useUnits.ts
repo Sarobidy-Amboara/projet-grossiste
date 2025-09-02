@@ -10,7 +10,7 @@ export interface Unit {
   updated_at?: string;
 }
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3001';
 
 export const useUnits = () => {
   const [units, setUnits] = useState<Unit[]>([]);
@@ -21,7 +21,7 @@ export const useUnits = () => {
     try {
       setLoading(true);
       
-      const response = await fetch(`${API_BASE_URL}/units`);
+      const response = await fetch(`${API_BASE_URL}/api/units`);
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des unités');
       }
@@ -41,7 +41,7 @@ export const useUnits = () => {
 
   const createUnit = async (unitData: Omit<Unit, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/units`, {
+      const response = await fetch(`${API_BASE_URL}/api/units`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,7 +70,7 @@ export const useUnits = () => {
 
   const updateUnit = async (id: string, unitData: Partial<Unit>) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/units/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/units/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +99,7 @@ export const useUnits = () => {
 
   const deleteUnit = async (id: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/units/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/units/${id}`, {
         method: 'DELETE',
       });
 

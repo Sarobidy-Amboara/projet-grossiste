@@ -17,7 +17,8 @@ import {
   DollarSign,
   Shield,
   Bell,
-  Palette
+  FileText,
+  Hash
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,9 +29,9 @@ interface SettingItem {
 }
 
 const SettingsPage = () => {
-  const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [settings, setSettings] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -39,18 +40,48 @@ const SettingsPage = () => {
     company_phone: "",
     company_email: "",
     company_website: "",
-    tax_rate: "",
-    currency: "",
+    company_nif: "",
+    company_stat: "",
+    tax_rate: "20",
+    currency: "MGA",
     receipt_footer: "",
-    low_stock_threshold: "",
+    low_stock_threshold: "10",
     enable_notifications: true,
     auto_backup: true,
-    theme_color: "tropical",
+    enable_tax: true,
   });
 
   const fetchSettings = async () => {
     try {
+      const response = await fetch('/api/settings');
+      if (response.ok) {
+        const data = await response.json();
+        const settingsObj: Record<string, string> = {};
+        data.forEach((setting: any) => {
+          settingsObj[setting.key] = setting.value;
+        });
+        setSettings(settingsObj);
+        
+        // Update form data with fetched settings
+        setFormData({
+          company_name: settingsObj.company_name || "",
+          company_address: settingsObj.company_address || "",
+          company_phone: settingsObj.company_phone || "",
+          company_email: settingsObj.company_email || "",
+          company_website: settingsObj.company_website || "",
+          company_nif: settingsObj.company_nif || "",
+          company_stat: settingsObj.company_stat || "",
+          tax_rate: settingsObj.tax_rate || "20",
+          currency: settingsObj.currency || "MGA",
+          receipt_footer: settingsObj.receipt_footer || "",
+          low_stock_threshold: settingsObj.low_stock_threshold || "10",
+          enable_notifications: settingsObj.enable_notifications === 'true',
+          auto_backup: settingsObj.auto_backup === 'true',
+          enable_tax: settingsObj.enable_tax !== 'false', // Par défaut true
+        });
+      }
     } catch (error: any) {
+      console.error('Erreur lors du chargement des paramètres:', error);
       toast({
         title: "Erreur",
         description: "Impossible de charger les paramètres",
@@ -62,7 +93,27 @@ const SettingsPage = () => {
   };
 
   const updateSetting = async (key: string, value: string) => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ key, value }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la mise à jour');
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du paramètre:', error);
+      throw error;
+    }
   };
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -74,21 +125,24 @@ const SettingsPage = () => {
         updateSetting("company_phone", formData.company_phone),
         updateSetting("company_email", formData.company_email),
         updateSetting("company_website", formData.company_website),
+        updateSetting("company_nif", formData.company_nif),
+        updateSetting("company_stat", formData.company_stat),
         updateSetting("tax_rate", formData.tax_rate),
         updateSetting("currency", formData.currency),
         updateSetting("receipt_footer", formData.receipt_footer),
         updateSetting("low_stock_threshold", formData.low_stock_threshold),
         updateSetting("enable_notifications", formData.enable_notifications.toString()),
         updateSetting("auto_backup", formData.auto_backup.toString()),
-        updateSetting("theme_color", formData.theme_color),
+        updateSetting("enable_tax", formData.enable_tax.toString()),
       ]);
 
       toast({
         title: "Paramètres sauvegardés",
         description: "Vos paramètres ont été mis à jour avec succès",
       });
-
-      fetchSettings(); // Refresh settings
+      
+      // Refresh settings
+      await fetchSettings();
     } catch (error: any) {
       toast({
         title: "Erreur",
@@ -99,10 +153,6 @@ const SettingsPage = () => {
       setSaving(false);
     }
   };
-
-  useEffect(() => {
-    fetchSettings();
-  }, []);
 
   if (loading) {
     return (
@@ -193,6 +243,34 @@ const SettingsPage = () => {
                 placeholder="https://www.entreprise.mg"
               />
             </div>
+
+            <Separator />
+
+            <div>
+              <Label htmlFor="company_nif" className="flex items-center gap-2">
+                <Hash className="h-4 w-4" />
+                NIF (Numéro d'Identification Fiscale)
+              </Label>
+              <Input
+                id="company_nif"
+                value={formData.company_nif}
+                onChange={(e) => setFormData({ ...formData, company_nif: e.target.value })}
+                placeholder="12345678901"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="company_stat" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                STAT (Statistique)
+              </Label>
+              <Input
+                id="company_stat"
+                value={formData.company_stat}
+                onChange={(e) => setFormData({ ...formData, company_stat: e.target.value })}
+                placeholder="12345678901234"
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -219,6 +297,21 @@ const SettingsPage = () => {
               </p>
             </div>
 
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Activer la TVA</Label>
+                <p className="text-xs text-muted-foreground">
+                  Activer ou désactiver l'application de la TVA
+                </p>
+              </div>
+              <Switch
+                checked={formData.enable_tax}
+                onCheckedChange={(checked) => 
+                  setFormData({ ...formData, enable_tax: checked })
+                }
+              />
+            </div>
+
             <div>
               <Label htmlFor="tax_rate">Taux de TVA (%)</Label>
               <Input
@@ -230,7 +323,11 @@ const SettingsPage = () => {
                 value={formData.tax_rate}
                 onChange={(e) => setFormData({ ...formData, tax_rate: e.target.value })}
                 placeholder="20.00"
+                disabled={!formData.enable_tax}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {formData.enable_tax ? "Taux de TVA appliqué sur les ventes" : "TVA désactivée"}
+              </p>
             </div>
 
             <div>
@@ -303,45 +400,6 @@ const SettingsPage = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* Appearance */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Apparence
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="theme_color">Couleur du thème</Label>
-              <div className="grid grid-cols-3 gap-2 mt-2">
-                {[
-                  { value: "tropical", label: "Tropical", color: "bg-gradient-to-r from-amber-400 to-orange-500" },
-                  { value: "ocean", label: "Océan", color: "bg-gradient-to-r from-blue-400 to-cyan-500" },
-                  { value: "forest", label: "Forêt", color: "bg-gradient-to-r from-green-400 to-emerald-500" },
-                  { value: "sunset", label: "Coucher", color: "bg-gradient-to-r from-pink-400 to-red-500" },
-                  { value: "purple", label: "Violet", color: "bg-gradient-to-r from-purple-400 to-indigo-500" },
-                  { value: "classic", label: "Classique", color: "bg-gradient-to-r from-gray-400 to-slate-500" },
-                ].map((theme) => (
-                  <button
-                    key={theme.value}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, theme_color: theme.value })}
-                    className={`p-3 rounded-lg border-2 transition-colors ${
-                      formData.theme_color === theme.value 
-                        ? "border-primary" 
-                        : "border-muted hover:border-primary/50"
-                    }`}
-                  >
-                    <div className={`w-full h-8 rounded ${theme.color} mb-1`} />
-                    <p className="text-xs font-medium">{theme.label}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* System Info */}
@@ -353,21 +411,43 @@ const SettingsPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <Label className="text-xs text-muted-foreground">Version</Label>
-              <p className="font-medium">Mada Brew Boss v1.0</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs text-muted-foreground">Version</Label>
+                <p className="font-medium">Mada Brew Boss v1.0</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Base de données</Label>
+                <p className="font-medium">SQLite</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Dernière sauvegarde</Label>
+                <p className="font-medium">Aujourd'hui</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Statut</Label>
+                <p className="font-medium text-green-600">En ligne</p>
+              </div>
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Base de données</Label>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Dernière sauvegarde</Label>
-              <p className="font-medium">Aujourd'hui</p>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Statut</Label>
-              <p className="font-medium text-green-600">En ligne</p>
+            
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs text-muted-foreground">Développeur</Label>
+                <p className="font-medium">Amboara Sarobidy RASOLOFOMANANA</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Contact</Label>
+                <p className="font-medium text-blue-600">amboarasarobidy2@gmail.com</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Licence</Label>
+                <p className="font-medium">Propriétaire</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Support</Label>
+                <p className="font-medium">Version 1.0</p>
+              </div>
             </div>
           </div>
         </CardContent>

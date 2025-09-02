@@ -7,12 +7,13 @@ import Layout from "./components/Layout";
 import Index from "./pages/Index";
 import Dashboard from "./components/Dashboard";
 import Products from "./pages/Products";
+import StockManagement from "./pages/StockManagement";
 import Customers from "./pages/Customers";
 import Sales from "./pages/Sales";
-import Settings from "./pages/Settings";
+import Purchases from "./pages/Purchases";
 import Units from "./pages/Units";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -26,8 +27,10 @@ const App = () => (
             <Route index element={<Index />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="products" element={<Products />} />
+            <Route path="stock" element={<StockManagement />} />
             <Route path="customers" element={<Customers />} />
             <Route path="sales" element={<Sales />} />
+            <Route path="purchases" element={<Purchases />} />
             <Route path="units" element={<Units />} />
             <Route path="settings" element={<Settings />} />
           </Route>

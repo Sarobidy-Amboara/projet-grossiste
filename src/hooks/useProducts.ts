@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
+
+const API_BASE_URL = 'http://localhost:3001';
 
 // Définition locale du type Product pour éviter les dépendances Supabase
 export interface Product {
@@ -21,22 +23,22 @@ export interface Product {
   supplier_name?: string;
   unit_base_name?: string;
   unit_base_abbreviation?: string;
+  stock_quantity?: number;
+  unit_price?: number;
   created_at?: string;
   updated_at?: string;
 }
-
-const API_BASE_URL = 'http://localhost:3001/api';
 
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       
-      const response = await fetch(`${API_BASE_URL}/products`);
+      const response = await fetch(`${API_BASE_URL}/api/products`);
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des produits');
       }
@@ -63,6 +65,8 @@ export const useProducts = () => {
         supplier_name: row.supplier_name,
         unit_base_name: row.unit_base_name,
         unit_base_abbreviation: row.unit_base_abbreviation,
+        stock_quantity: row.stock_quantity || 0,
+        unit_price: row.unit_price,
         created_at: row.created_at,
         updated_at: row.updated_at
       }));
@@ -77,11 +81,11 @@ export const useProducts = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const createProduct = async (productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products`, {
+      const response = await fetch(`${API_BASE_URL}/api/products`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -114,7 +118,7 @@ export const useProducts = () => {
 
   const updateProduct = async (id: string, productData: Partial<Product>) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/products/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -144,7 +148,7 @@ export const useProducts = () => {
 
   const deleteProduct = async (id: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/products/${id}`, {
         method: 'DELETE',
       });
 

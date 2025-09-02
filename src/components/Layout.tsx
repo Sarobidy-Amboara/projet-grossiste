@@ -9,22 +9,23 @@ import {
   Settings, 
   BarChart3,
   Menu,
-  LogOut,
-  Ruler
+  Ruler,
+  Truck,
+  Archive
 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const location = useLocation();
-  const { signOut, profile } = useAuth();
 
   const navigation = [
     { name: "Point de Vente", href: "/", icon: ShoppingCart },
     { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
     { name: "Produits", href: "/products", icon: Package },
+    { name: "Stock", href: "/stock", icon: Archive },
     { name: "Clients", href: "/customers", icon: Users },
     { name: "Ventes", href: "/sales", icon: CreditCard },
+    { name: "Achats", href: "/purchases", icon: Truck },
     { name: "Unités", href: "/units", icon: Ruler },
     { name: "Paramètres", href: "/settings", icon: Settings },
   ];
@@ -74,23 +75,6 @@ const Layout = () => {
           </div>
         </nav>
 
-        {/* User Info & Logout */}
-        <div className="p-4 border-t border-border">
-          {sidebarOpen && profile && (
-            <div className="mb-2 text-sm text-muted-foreground">
-              <p className="font-medium">{profile.first_name} {profile.last_name}</p>
-              <p className="capitalize">{profile.role}</p>
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            className={`w-full justify-start text-destructive hover:text-destructive ${!sidebarOpen && 'px-2'}`}
-            onClick={signOut}
-          >
-            <LogOut className="h-5 w-5" />
-            {sidebarOpen && <span className="ml-3">Déconnexion</span>}
-          </Button>
-        </div>
       </div>
 
       {/* Main Content */}

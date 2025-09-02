@@ -6,6 +6,7 @@ export interface UnitConversion {
   product_id: string;
   unit_id: string;
   equivalent_quantity: number;
+  prix_unitaire?: number;
   unit_name?: string;
   unit_abbreviation?: string;
   product_name?: string;
@@ -13,7 +14,7 @@ export interface UnitConversion {
   updated_at?: string;
 }
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3001';
 
 export const useUnitConversions = () => {
   const [conversions, setConversions] = useState<UnitConversion[]>([]);
@@ -25,8 +26,8 @@ export const useUnitConversions = () => {
       setLoading(true);
       
       const url = productId 
-        ? `${API_BASE_URL}/unit-conversions?product_id=${productId}`
-        : `${API_BASE_URL}/unit-conversions`;
+        ? `${API_BASE_URL}/api/unit-conversions?product_id=${productId}`
+        : `${API_BASE_URL}/api/unit-conversions`;
       
       const response = await fetch(url);
       if (!response.ok) {
@@ -48,7 +49,9 @@ export const useUnitConversions = () => {
 
   const createConversion = async (conversionData: Omit<UnitConversion, 'id' | 'created_at' | 'updated_at' | 'unit_name' | 'unit_abbreviation' | 'product_name'>) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/unit-conversions`, {
+      console.log('🚀 Envoi des données de conversion au serveur:', conversionData);
+      
+      const response = await fetch(`${API_BASE_URL}/api/unit-conversions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +80,7 @@ export const useUnitConversions = () => {
 
   const updateConversion = async (id: string, conversionData: Partial<UnitConversion>) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/unit-conversions/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/unit-conversions/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -106,7 +109,7 @@ export const useUnitConversions = () => {
 
   const deleteConversion = async (id: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/unit-conversions/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/unit-conversions/${id}`, {
         method: 'DELETE',
       });
 

@@ -29,13 +29,13 @@ import {
   DollarSign,
   Tag,
   TrendingUp,
-  Filter,
-  Building
+  Filter
 } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
-import { useSuppliers } from "@/hooks/useSuppliers";
 import { useUnits } from "@/hooks/useUnits";
+import { usePriceTiers } from "@/hooks/usePriceTiers";
+import { useUnitConversions } from "@/hooks/useUnitConversions";
 import { useToast } from "@/hooks/use-toast";
 
 const ProductsPage = () => {
@@ -54,15 +54,65 @@ const ProductsPage = () => {
     name: "",
     description: "",
     category_id: "",
-    supplier_id: "",
     unite_base_id: "",
     barcode: "",
+    unit_price: 0,
   });
 
-  const { products, loading, createProduct, updateProduct, deleteProduct } = useProducts();
+  // États pour la gestion des prix et conversions
+  const [priceTiers, setPriceTiers] = useState([
+    { tier_name: "Prix unitaire", min_quantity: 1, max_quantity: null, unit_price: 0 }
+  ]);
+  const [unitConversions, setUnitConversions] = useState([]);
+  const [showPricingSection, setShowPricingSection] = useState(false);
+  
+  // États pour l'affichage des prix et conversions dans la liste
+  const [productPricesDisplay, setProductPricesDisplay] = useState<{[key: string]: any[]}>({});
+  const [productConversionsDisplay, setProductConversionsDisplay] = useState<{[key: string]: any[]}>({});
+
+  const { products, loading, createProduct, updateProduct, deleteProduct, refetch } = useProducts();
   const { categories, createCategory, updateCategory, deleteCategory } = useCategories();
-  const { suppliers } = useSuppliers();
   const { units } = useUnits();
+  const { createPriceTiers, fetchPriceTiers } = usePriceTiers();
+  const { createConversion, fetchConversions } = useUnitConversions();
+
+  // Fonction pour charger les prix et conversions pour l'affichage
+  const loadProductPricesAndConversions = async () => {
+    try {
+      const pricesData: {[key: string]: any[]} = {};
+      const conversionsData: {[key: string]: any[]} = {};
+      
+      for (const product of products) {
+        // Charger les prix
+        try {
+          const prices = await fetchPriceTiers(product.id);
+          if (prices && prices.length > 0) {
+            pricesData[product.id] = prices;
+          }
+        } catch (error) {
+          console.error(`Erreur lors du chargement des prix pour ${product.name}:`, error);
+        }
+        
+        // Charger les conversions
+        try {
+          const response = await fetch(`/api/unit-conversions/product/${product.id}`);
+          if (response.ok) {
+            const conversions = await response.json();
+            if (conversions && conversions.length > 0) {
+              conversionsData[product.id] = conversions;
+            }
+          }
+        } catch (error) {
+          console.error(`Erreur lors du chargement des conversions pour ${product.name}:`, error);
+        }
+      }
+      
+      setProductPricesDisplay(pricesData);
+      setProductConversionsDisplay(conversionsData);
+    } catch (error) {
+      console.error('Erreur lors du chargement des prix et conversions:', error);
+    }
+  };
   const { toast } = useToast();
 
   const categoriesWithAll = [
@@ -76,28 +126,94 @@ const ProductsPage = () => {
     return matchesSearch && matchesCategory;
   });
 
+  // Charger les prix et conversions quand les produits changent
+  useEffect(() => {
+    if (products.length > 0) {
+      loadProductPricesAndConversions();
+    }
+  }, [products]);
+
   const resetForm = () => {
     setFormData({
       name: "",
       description: "",
       category_id: "",
-      supplier_id: "",
       unite_base_id: "",
       barcode: "",
+      unit_price: 0,
     });
+    setPriceTiers([
+      { tier_name: "Prix unitaire", min_quantity: 1, max_quantity: null, unit_price: 0 }
+    ]);
+    setUnitConversions([]);
+    setShowPricingSection(false);
     setEditingProduct(null);
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = async (product: Product) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
       description: product.description || "",
       category_id: product.category_id || "",
-      supplier_id: product.supplier_id || "",
       unite_base_id: product.unite_base_id || "",
       barcode: product.barcode || "",
+      unit_price: product.unit_price || 0,
     });
+    
+    // Charger les prix et conversions existants
+    try {
+      console.log('🔍 Chargement des données existantes pour le produit:', product.id);
+      const existingPriceTiers = await fetchPriceTiers(product.id);
+      console.log('📊 Prix existants reçus:', existingPriceTiers);
+      
+      // Récupérer les conversions via API directe
+      const conversionsResponse = await fetch(`/api/unit-conversions?product_id=${product.id}`);
+      const existingConversions = conversionsResponse.ok ? await conversionsResponse.json() : [];
+      console.log('🔄 Conversions existantes reçues:', existingConversions);
+      
+      if (existingPriceTiers && existingPriceTiers.length > 0) {
+        const mappedTiers = existingPriceTiers.map(tier => ({
+          tier_name: tier.tier_name,
+          min_quantity: tier.min_quantity,
+          max_quantity: tier.max_quantity,
+          unit_price: tier.unit_price
+        }));
+        console.log('📋 Prix transformés pour le state:', mappedTiers);
+        setPriceTiers(mappedTiers);
+      } else {
+        // Si pas de prix existants, garder le prix unitaire par défaut
+        setPriceTiers([
+          { tier_name: "Prix unitaire", min_quantity: 1, max_quantity: null, unit_price: product.unit_price || 0 }
+        ]);
+      }
+      
+      if (existingConversions && existingConversions.length > 0) {
+        const mappedConversions = existingConversions.map(conv => ({
+          unit_id: conv.unit_id,
+          equivalent_quantity: conv.equivalent_quantity,
+          prix_unitaire: conv.prix_unitaire || 0
+        }));
+        console.log('🔄 Conversions transformées pour le state:', mappedConversions);
+        console.log('🔍 Détail de chaque conversion:');
+        mappedConversions.forEach((conv, index) => {
+          console.log(`  Conversion ${index}:`, {
+            unit_id: conv.unit_id,
+            equivalent_quantity: conv.equivalent_quantity,
+            prix_unitaire: conv.prix_unitaire,
+            type_prix: typeof conv.prix_unitaire
+          });
+        });
+        setUnitConversions(mappedConversions);
+      } else {
+        setUnitConversions([]);
+      }
+      
+      setShowPricingSection(true);
+    } catch (error) {
+      console.error('Erreur lors du chargement des prix/conversions:', error);
+    }
+    
     setDialogOpen(true);
   };
 
@@ -113,27 +229,111 @@ const ProductsPage = () => {
       return;
     }
 
+    // Récupérer le nom de l'unité de base sélectionnée
+    const selectedUnit = units.find(u => u.id === formData.unite_base_id);
     const productData = {
       name: formData.name,
       description: formData.description,
       category_id: formData.category_id || null,
-      supplier_id: formData.supplier_id || null,
       unite_base_id: formData.unite_base_id || null,
+      unit: selectedUnit ? selectedUnit.name : '',
       barcode: formData.barcode,
+      unit_price: formData.unit_price || 0,
       is_active: true,
       tax_rate: 20.00,
     };
 
     try {
+      let productId;
       if (editingProduct) {
         await updateProduct(editingProduct.id, productData);
+        productId = editingProduct.id;
       } else {
-        await createProduct(productData as any);
+        const newProduct = await createProduct(productData as any);
+        productId = newProduct.id;
       }
+
+      // Sauvegarder les prix si configurés
+      console.log('🔍 Vérification des conditions de sauvegarde des prix:');
+      console.log('📊 showPricingSection:', showPricingSection);
+      console.log('💰 priceTiers:', priceTiers);
+      console.log('✅ Certains prix > 0:', priceTiers.some(tier => tier.unit_price > 0));
+      
+      if (showPricingSection) {
+        const validTiers = priceTiers.filter(tier => tier.unit_price > 0);
+        console.log('💰 Sauvegarde des prix pour le produit:', productId);
+        console.log('📋 Prix valides à sauvegarder:', validTiers);
+        
+        // Toujours faire l'appel à l'API pour mettre à jour les paliers
+        // (même si validTiers est vide, cela supprimera les anciens paliers)
+        const tiersData = {
+          product_id: productId,
+          tiers: validTiers
+        };
+        console.log('📤 Données envoyées à l\'API price-tiers:', tiersData);
+        
+        await createPriceTiers(tiersData);
+        console.log('✅ Prix sauvegardés avec succès');
+      } else {
+        console.log('❌ showPricingSection est false - pas de sauvegarde des prix');
+      }
+
+      // Sauvegarder les conversions si configurées
+      if (unitConversions.length > 0) {
+        // Si on modifie un produit, supprimer d'abord les anciennes conversions
+        if (editingProduct) {
+          try {
+            const existingConversionsResponse = await fetch(`/api/unit-conversions?product_id=${productId}`);
+            if (existingConversionsResponse.ok) {
+              const existingConversions = await existingConversionsResponse.json();
+              for (const conv of existingConversions) {
+                await fetch(`/api/unit-conversions/${conv.id}`, { method: 'DELETE' });
+              }
+            }
+          } catch (error) {
+            console.error('Erreur lors de la suppression des anciennes conversions:', error);
+          }
+        }
+        
+        // Créer les nouvelles conversions
+        for (const conversion of unitConversions) {
+          if (conversion.unit_id && conversion.equivalent_quantity > 0) {
+            console.log('🔍 Données de conversion envoyées:', {
+              product_id: productId,
+              unit_id: conversion.unit_id,
+              equivalent_quantity: conversion.equivalent_quantity,
+              prix_unitaire: conversion.prix_unitaire || 0
+            });
+            await createConversion({
+              product_id: productId,
+              unit_id: conversion.unit_id,
+              equivalent_quantity: conversion.equivalent_quantity,
+              prix_unitaire: conversion.prix_unitaire || 0
+            });
+          }
+        }
+      }
+
+      toast({
+        title: "Succès",
+        description: editingProduct ? "Produit modifié avec succès" : "Produit créé avec succès",
+      });
+
       setDialogOpen(false);
       resetForm();
+      refetch();
+      
+      // Recharger les prix et conversions pour l'affichage
+      setTimeout(() => {
+        loadProductPricesAndConversions();
+      }, 500);
     } catch (error) {
       console.error("Erreur lors de la sauvegarde:", error);
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la sauvegarde du produit",
+        variant: "destructive",
+      });
     }
   };
 
@@ -141,6 +341,49 @@ const ProductsPage = () => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) {
       await deleteProduct(id);
     }
+  };
+
+  // Fonctions pour gérer les prix par paliers
+  const addPriceTier = () => {
+    setPriceTiers([...priceTiers, {
+      tier_name: "",
+      min_quantity: 1,
+      max_quantity: null,
+      unit_price: 0
+    }]);
+  };
+
+  const updatePriceTier = (index: number, field: string, value: any) => {
+    const updatedTiers = [...priceTiers];
+    updatedTiers[index] = { ...updatedTiers[index], [field]: value };
+    setPriceTiers(updatedTiers);
+  };
+
+  const removePriceTier = (index: number) => {
+    const updatedTiers = priceTiers.filter((_, i) => i !== index);
+    setPriceTiers(updatedTiers);
+    console.log('🗑️ Palier supprimé, tiers restants:', updatedTiers);
+  };
+
+  // Fonctions pour gérer les conversions d'unités
+  const addUnitConversion = () => {
+    setUnitConversions([...unitConversions, {
+      unit_id: "",
+      equivalent_quantity: 1,
+      prix_unitaire: 0
+    }]);
+  };
+
+  const updateUnitConversion = (index: number, field: string, value: any) => {
+    const updatedConversions = [...unitConversions];
+    updatedConversions[index] = { ...updatedConversions[index], [field]: value };
+    console.log(`🔄 Mise à jour conversion ${index}, champ ${field}:`, value);
+    console.log('📊 Conversions après mise à jour:', updatedConversions);
+    setUnitConversions(updatedConversions);
+  };
+
+  const removeUnitConversion = (index: number) => {
+    setUnitConversions(unitConversions.filter((_, i) => i !== index));
   };
 
   // Fonctions pour gérer les catégories
@@ -283,14 +526,19 @@ const ProductsPage = () => {
           </Dialog>
           
           {/* Bouton Nouveau Produit */}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) {
+              resetForm();
+            }
+          }}>
             <DialogTrigger asChild>
               <Button onClick={resetForm}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nouveau Produit
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingProduct ? "Modifier le produit" : "Nouveau produit"}
@@ -324,7 +572,11 @@ const ProductsPage = () => {
 
                 <div>
                   <Label htmlFor="category">Catégorie</Label>
-                  <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
+                  <Select 
+                    key={`category-${formData.category_id}`}
+                    value={formData.category_id} 
+                    onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner une catégorie" />
                     </SelectTrigger>
@@ -339,24 +591,12 @@ const ProductsPage = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="supplier">Fournisseur</Label>
-                  <Select value={formData.supplier_id} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un fournisseur" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
                   <Label htmlFor="unit_base">Unité de base</Label>
-                  <Select value={formData.unite_base_id} onValueChange={(value) => setFormData({ ...formData, unite_base_id: value })}>
+                  <Select 
+                    key={`unit-base-${formData.unite_base_id}`}
+                    value={formData.unite_base_id} 
+                    onValueChange={(value) => setFormData({ ...formData, unite_base_id: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner une unité de base" />
                     </SelectTrigger>
@@ -379,7 +619,205 @@ const ProductsPage = () => {
                     placeholder="Code-barres du produit"
                   />
                 </div>
+                
+                <div>
+                  <Label htmlFor="unit_price">Prix unitaire (MGA) *</Label>
+                  <Input
+                    id="unit_price"
+                    type="number"
+                    min="0"
+                    value={formData.unit_price || 0}
+                    onChange={(e) => setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })}
+                    placeholder="Prix de vente par unité de base"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Prix de vente pour l'unité de base sélectionnée
+                  </p>
+                </div>
               </div>
+
+              {/* Bouton pour afficher la configuration des prix */}
+              <div className="flex items-center justify-between border-t pt-4">
+                <div>
+                  <h3 className="font-medium">Configuration des prix et conversions</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Configurez les prix par paliers et les conversions d'unités
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowPricingSection(!showPricingSection)}
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  {showPricingSection ? "Masquer" : "Configurer"}
+                </Button>
+              </div>
+
+              {/* Section de configuration des prix */}
+              {showPricingSection && (
+                <div className="space-y-6 border-t pt-4">
+                  {/* Prix par paliers */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <Tag className="h-4 w-4" />
+                        Prix par paliers
+                      </h4>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addPriceTier}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Ajouter
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {priceTiers.map((tier, index) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                          <div className="col-span-4">
+                            <Label>Nom du palier</Label>
+                            <Input
+                              value={tier.tier_name}
+                              onChange={(e) => updatePriceTier(index, 'tier_name', e.target.value)}
+                              placeholder="Ex: Prix unitaire"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Label>Qté min</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={tier.min_quantity}
+                              onChange={(e) => updatePriceTier(index, 'min_quantity', parseInt(e.target.value) || 1)}
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Label>Qté max</Label>
+                            <Input
+                              type="number"
+                              value={tier.max_quantity || ""}
+                              onChange={(e) => updatePriceTier(index, 'max_quantity', e.target.value ? parseInt(e.target.value) : null)}
+                              placeholder="Illimité"
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Label>Prix (MGA)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={tier.unit_price}
+                              onChange={(e) => updatePriceTier(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div className="col-span-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removePriceTier(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Conversions d'unités */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        Conversions d'unités
+                      </h4>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addUnitConversion}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Ajouter
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {unitConversions.map((conversion, index) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                          <div className="col-span-4">
+                            <Label>Unité de vente</Label>
+                            <Select
+                              value={conversion.unit_id}
+                              onValueChange={(value) => updateUnitConversion(index, 'unit_id', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner une unité" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {units.filter(unit => unit.id !== formData.unite_base_id).map((unit) => (
+                                  <SelectItem key={unit.id} value={unit.id}>
+                                    {unit.name} ({unit.abbreviation})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-3">
+                            <Label>Quantité équivalente</Label>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">1 =</span>
+                              <Input
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                value={conversion.equivalent_quantity}
+                                onChange={(e) => updateUnitConversion(index, 'equivalent_quantity', parseFloat(e.target.value) || 1)}
+                              />
+                              <span className="text-sm text-muted-foreground">
+                                {units.find(u => u.id === formData.unite_base_id)?.abbreviation || 'base'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="col-span-4">
+                            <Label>Prix de vente (MGA)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="100"
+                              value={conversion.prix_unitaire || 0}
+                              onChange={(e) => updateUnitConversion(index, 'prix_unitaire', parseFloat(e.target.value) || 0)}
+                              placeholder="Prix pour cette unité"
+                            />
+                          </div>
+                          <div className="col-span-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeUnitConversion(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {unitConversions.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Aucune conversion configurée. Les conversions permettent de vendre le produit dans différentes unités.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
               
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
@@ -540,23 +978,32 @@ const ProductsPage = () => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <CardTitle className="text-lg line-clamp-2">{product.name}</CardTitle>
-                  {product.category_name && (
-                    <Badge variant="secondary" className="mt-1">
-                      {product.category_name}
-                    </Badge>
-                  )}
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {product.category_name && (
+                      <Badge variant="secondary">
+                        {product.category_name}
+                      </Badge>
+                    )}
+                    
+                    {/* Badge pour les prix configurés */}
+                    {productPricesDisplay[product.id] && productPricesDisplay[product.id].length > 0 && (
+                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                        {productPricesDisplay[product.id].length} prix configuré{productPricesDisplay[product.id].length > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                    
+                    {/* Badge pour les conversions configurées */}
+                    {productConversionsDisplay[product.id] && productConversionsDisplay[product.id].length > 0 && (
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                        {productConversionsDisplay[product.id].length} conversion{productConversionsDisplay[product.id].length > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardHeader>
             
             <CardContent className="space-y-3">
-              {product.supplier_name && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Building className="h-4 w-4" />
-                  <span>{product.supplier_name}</span>
-                </div>
-              )}
-              
               {product.description && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span className="truncate">{product.description}</span>
@@ -573,6 +1020,44 @@ const ProductsPage = () => {
               {product.barcode && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Code-barres: {product.barcode}</span>
+                </div>
+              )}
+
+              {/* Affichage des prix configurés */}
+              {productPricesDisplay[product.id] && productPricesDisplay[product.id].length > 0 && (
+                <div className="border-t pt-2">
+                  <h4 className="text-sm font-medium mb-1">Prix configurés:</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {productPricesDisplay[product.id].slice(0, 3).map((price: any, index: number) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {price.tier_name}: {price.unit_price?.toLocaleString()} MGA
+                      </Badge>
+                    ))}
+                    {productPricesDisplay[product.id].length > 3 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{productPricesDisplay[product.id].length - 3} autre{productPricesDisplay[product.id].length - 3 > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Affichage des conversions configurées */}
+              {productConversionsDisplay[product.id] && productConversionsDisplay[product.id].length > 0 && (
+                <div className="border-t pt-2">
+                  <h4 className="text-sm font-medium mb-1">Conversions:</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {productConversionsDisplay[product.id].slice(0, 2).map((conversion: any, index: number) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        1 {conversion.unit_name} = {conversion.equivalent_quantity} {product.unit_base_abbreviation}
+                      </Badge>
+                    ))}
+                    {productConversionsDisplay[product.id].length > 2 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{productConversionsDisplay[product.id].length - 2} autre{productConversionsDisplay[product.id].length - 2 > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               )}
               

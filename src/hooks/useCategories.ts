@@ -11,7 +11,7 @@ export interface Category {
   updated_at: string;
 }
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3001';
 
 export const useCategories = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -20,7 +20,7 @@ export const useCategories = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/categories`);
+      const response = await fetch(`${API_BASE_URL}/api/categories`);
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des catégories');
       }
@@ -50,7 +50,7 @@ export const useCategories = () => {
 
   const createCategory = async (categoryData: Omit<Category, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/categories`, {
+      const response = await fetch(`${API_BASE_URL}/api/categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,7 +83,7 @@ export const useCategories = () => {
 
   const updateCategory = async (id: string, categoryData: Partial<Category>) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +115,7 @@ export const useCategories = () => {
 
   const deleteCategory = async (id: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
         method: 'DELETE',
       });
       
