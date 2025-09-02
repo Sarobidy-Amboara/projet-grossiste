@@ -70,7 +70,7 @@ const PointOfSale = () => {
     receipt_footer: "" 
   });
 
-  const { products, loading: productsLoading, refetch: refetchProducts } = useProducts();
+  const { products, loading: productsLoading, refetch: refetchProducts } = useProducts(true); // Seulement les produits actifs
   const { categories, loading: categoriesLoading } = useCategories();
   const { customers, getDefaultCustomer } = useCustomers();
   const { createSale } = useSales();
@@ -126,7 +126,7 @@ const PointOfSale = () => {
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || product.category_id === selectedCategory;
-    return matchesSearch && matchesCategory && product.is_active && product.stock_quantity > 0;
+    return matchesSearch && matchesCategory && product.stock_quantity > 0; // Plus besoin de filtrer par is_active
   });
 
   // Charger les prix configurés pour tous les produits (optimisé)

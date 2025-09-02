@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
@@ -29,7 +30,8 @@ import {
   DollarSign,
   Tag,
   TrendingUp,
-  Filter
+  Filter,
+  Download
 } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
@@ -37,10 +39,12 @@ import { useUnits } from "@/hooks/useUnits";
 import { usePriceTiers } from "@/hooks/usePriceTiers";
 import { useUnitConversions } from "@/hooks/useUnitConversions";
 import { useToast } from "@/hooks/use-toast";
+import { exportToExcel } from "@/lib/excel-export";
 
 const ProductsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all"); // Nouveau filtre pour le statut
   const [dialogOpen, setDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -57,6 +61,7 @@ const ProductsPage = () => {
     unite_base_id: "",
     barcode: "",
     unit_price: 0,
+    is_active: true, // Ajout du champ actif/inactif
   });
 
   // États pour la gestion des prix et conversions
@@ -123,7 +128,8 @@ const ProductsPage = () => {
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || product.category_id === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? product.is_active : !product.is_active);
+    return matchesSearch && matchesCategory && matchesStatus;
   });
 
   // Charger les prix et conversions quand les produits changent
@@ -141,6 +147,7 @@ const ProductsPage = () => {
       unite_base_id: "",
       barcode: "",
       unit_price: 0,
+      is_active: true, // Défaut: actif
     });
     setPriceTiers([
       { tier_name: "Prix unitaire", min_quantity: 1, max_quantity: null, unit_price: 0 }
@@ -159,6 +166,7 @@ const ProductsPage = () => {
       unite_base_id: product.unite_base_id || "",
       barcode: product.barcode || "",
       unit_price: product.unit_price || 0,
+      is_active: product.is_active !== undefined ? product.is_active : true, // Inclure le statut actif
     });
     
     // Charger les prix et conversions existants
@@ -239,7 +247,7 @@ const ProductsPage = () => {
       unit: selectedUnit ? selectedUnit.name : '',
       barcode: formData.barcode,
       unit_price: formData.unit_price || 0,
-      is_active: true,
+      is_active: formData.is_active, // Utiliser la valeur du formulaire
       tax_rate: 20.00,
     };
 
@@ -343,6 +351,31 @@ const ProductsPage = () => {
     }
   };
 
+  const handleToggleActive = async (product: Product) => {
+    try {
+      const updatedProduct = {
+        ...product,
+        is_active: !Boolean(product.is_active) // Assurer la conversion en boolean
+      };
+
+      await updateProduct(product.id, updatedProduct);
+      
+      toast({
+        title: "Succès",
+        description: `Produit ${updatedProduct.is_active ? 'activé' : 'désactivé'} avec succès`,
+      });
+
+      refetch();
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour:", error);
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la mise à jour du statut",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Fonctions pour gérer les prix par paliers
   const addPriceTier = () => {
     setPriceTiers([...priceTiers, {
@@ -437,6 +470,41 @@ const ProductsPage = () => {
     }
   };
 
+  // Fonction d'export Excel des produits
+  const handleExportProducts = () => {
+    const exportData = filteredProducts.map(product => ({
+      'Nom du produit': product.name,
+      'Catégorie': product.category_name || 'Sans catégorie',
+      'Description': product.description || '',
+      'Code-barres': product.barcode || '',
+      'Unité de base': product.unit_base_name || '',
+      'Quantité en stock': product.stock_quantity || 0,
+      'Statut': product.is_active ? 'Actif' : 'Inactif',
+      'Fournisseur': product.supplier_name || '',
+      'Date de création': product.created_at ? new Date(product.created_at).toLocaleDateString('fr-FR') : '',
+      'Date de modification': product.updated_at ? new Date(product.updated_at).toLocaleDateString('fr-FR') : ''
+    }));
+
+    const success = exportToExcel({
+      filename: `produits_${new Date().toISOString().split('T')[0]}`,
+      data: exportData,
+      sheetName: 'Produits'
+    });
+
+    if (success) {
+      toast({
+        title: "Export réussi",
+        description: "La liste des produits a été exportée vers Excel",
+      });
+    } else {
+      toast({
+        title: "Erreur d'export",
+        description: "Une erreur est survenue lors de l'export",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Calculs des statistiques
   const totalProducts = products.length;
   const activeCategories = categories.length;
@@ -464,6 +532,12 @@ const ProductsPage = () => {
         </div>
         
         <div className="flex gap-2">
+          {/* Bouton Export Excel */}
+          <Button variant="outline" onClick={handleExportProducts}>
+            <Download className="h-4 w-4 mr-2" />
+            Exporter Excel
+          </Button>
+          
           {/* Bouton Nouvelle Catégorie */}
           <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
             <DialogTrigger asChild>
@@ -632,6 +706,21 @@ const ProductsPage = () => {
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Prix de vente pour l'unité de base sélectionnée
+                  </p>
+                </div>
+
+                {/* Champ Actif/Inactif */}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="is_active"
+                    checked={formData.is_active}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                  />
+                  <Label htmlFor="is_active" className="text-sm font-medium">
+                    Produit actif
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.is_active ? "Visible dans les ventes et achats" : "Masqué des ventes et achats"}
                   </p>
                 </div>
               </div>
@@ -914,6 +1003,33 @@ const ProductsPage = () => {
                       </div>
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+
+              {/* Filtre par statut */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-3 w-3" />
+                      Tous
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="active">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-3 w-3 text-green-600" />
+                      Actifs
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="inactive">
+                    <div className="flex items-center gap-2">
+                      <Archive className="h-3 w-3 text-orange-600" />
+                      Inactifs
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
 

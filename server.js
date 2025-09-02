@@ -26,7 +26,6 @@ app.get('/api/products', (req, res) => {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN unite u ON p.unite_base_id = u.id
-      WHERE p.is_active = 1
       ORDER BY p.name
     `);
     
@@ -34,6 +33,31 @@ app.get('/api/products', (req, res) => {
     res.json(products);
   } catch (error) {
     console.error('Erreur lors de la récupération des produits:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Endpoint pour récupérer seulement les produits actifs (pour les ventes/achats)
+app.get('/api/products/active', (req, res) => {
+  try {
+    const stmt = db.prepare(`
+      SELECT 
+        p.*,
+        c.name as category_name,
+        c.color as category_color,
+        u.name as unit_base_name,
+        u.abbreviation as unit_base_abbreviation
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN unite u ON p.unite_base_id = u.id
+      WHERE p.is_active = 1
+      ORDER BY p.name
+    `);
+    
+    const products = stmt.all();
+    res.json(products);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des produits actifs:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -89,8 +113,16 @@ app.put('/api/products/:id', (req, res) => {
     const updateFields = [];
     const values = [];
 
+    // Liste des champs valides dans la table products
+    const validFields = [
+      'name', 'description', 'category_id', 'unite_base_id', 'unit', 
+      'barcode', 'batch_number', 'expiry_date', 'is_active', 'tax_rate', 
+      'image_url', 'stock_quantity', 'unit_price', 'minimum_stock_level', 
+      'purchase_price', 'wholesale_price', 'min_stock_level'
+    ];
+
     Object.entries(productData).forEach(([key, value]) => {
-      if (value !== undefined && key !== 'id') {
+      if (value !== undefined && key !== 'id' && validFields.includes(key)) {
         updateFields.push(`${key} = ?`);
         values.push(key === 'is_active' ? (value ? 1 : 0) : value);
       }
@@ -123,18 +155,56 @@ app.delete('/api/products/:id', (req, res) => {
   try {
     const { id } = req.params;
     
-    // Soft delete - marquer comme inactif
-    const stmt = db.prepare('UPDATE products SET is_active = 0 WHERE id = ?');
-    const result = stmt.run(id);
+    // Supprimer en cascade - désactiver temporairement les contraintes FK
+    db.pragma('foreign_keys = OFF');
     
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Produit non trouvé' });
-    }
-
-    res.json({ message: 'Produit supprimé avec succès' });
+    // Transaction pour supprimer toutes les dépendances
+    const transaction = db.transaction(() => {
+      // Supprimer les conversions d'unités
+      const deleteConversions = db.prepare('DELETE FROM conversion_unite WHERE product_id = ?');
+      deleteConversions.run(id);
+      
+      // Supprimer les prix par tiers
+      const deletePriceTiers = db.prepare('DELETE FROM price_tiers WHERE product_id = ?');
+      deletePriceTiers.run(id);
+      
+      // Supprimer les mouvements de stock
+      const deleteStockMovements = db.prepare('DELETE FROM stock_movements WHERE product_id = ?');
+      deleteStockMovements.run(id);
+      
+      // Supprimer les items d'achat
+      const deletePurchaseItems = db.prepare('DELETE FROM purchase_items WHERE product_id = ?');
+      deletePurchaseItems.run(id);
+      
+      // Supprimer les items de vente
+      const deleteSaleItems = db.prepare('DELETE FROM sale_items WHERE product_id = ?');
+      deleteSaleItems.run(id);
+      
+      // Supprimer les items de pack
+      const deletePackItems = db.prepare('DELETE FROM pack_items WHERE product_id = ?');
+      deletePackItems.run(id);
+      
+      // Supprimer le produit
+      const deleteProduct = db.prepare('DELETE FROM products WHERE id = ?');
+      const result = deleteProduct.run(id);
+      
+      if (result.changes === 0) {
+        throw new Error('Produit non trouvé');
+      }
+    });
+    
+    // Exécuter la transaction
+    transaction();
+    
+    // Réactiver les contraintes FK
+    db.pragma('foreign_keys = ON');
+    
+    res.json({ message: 'Produit supprimé avec succès (avec toutes ses dépendances)' });
   } catch (error) {
+    // S'assurer que les contraintes sont réactivées en cas d'erreur
+    db.pragma('foreign_keys = ON');
     console.error('Erreur lors de la suppression du produit:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Erreur serveur: ' + error.message });
   }
 });
 

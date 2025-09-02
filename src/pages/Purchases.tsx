@@ -41,7 +41,7 @@ interface PurchaseOrder {
 export default function Purchases() {
   const { toast } = useToast();
   const { suppliers, loading: suppliersLoading, createSupplier, updateSupplier, deleteSupplier, refetch: fetchSuppliers } = useSuppliers();
-  const { products, loading: productsLoading, refetch: fetchProducts } = useProducts();
+  const { products, loading: productsLoading, refetch: fetchProducts } = useProducts(true); // Seulement les produits actifs
   const { units } = useUnits();
   const { purchases, loading: purchasesLoading, createPurchase, fetchPurchases, getPurchaseById } = usePurchases();
   const { categories, loading: categoriesLoading } = useCategories();
@@ -80,7 +80,7 @@ export default function Purchases() {
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategoryFilter === 'all' || product.category_id === selectedCategoryFilter;
-    return matchesSearch && matchesCategory && product.is_active;
+    return matchesSearch && matchesCategory; // Plus besoin de filtrer par is_active car l'API le fait
   });
 
   // Fonction utilitaire pour calculer le stock dans une unité spécifique
@@ -494,7 +494,7 @@ export default function Purchases() {
         </TabsList>
 
         <TabsContent value="purchases" className="space-y-6">
-          <div className="flex h-[calc(100vh-200px)] gap-6">
+          <div className="h-screen flex gap-6">
             {/* Colonne Produits - Gauche */}
             <div className="flex-1 flex flex-col bg-card border border-border rounded-lg shadow-ambient">
               <div className="p-4 border-b border-border">

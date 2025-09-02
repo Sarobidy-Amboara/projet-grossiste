@@ -29,7 +29,7 @@ export interface Product {
   updated_at?: string;
 }
 
-export const useProducts = () => {
+export const useProducts = (onlyActive: boolean = false) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -38,7 +38,8 @@ export const useProducts = () => {
     try {
       setLoading(true);
       
-      const response = await fetch(`${API_BASE_URL}/api/products`);
+      const endpoint = onlyActive ? '/api/products/active' : '/api/products';
+      const response = await fetch(`${API_BASE_URL}${endpoint}`);
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des produits');
       }
@@ -58,7 +59,7 @@ export const useProducts = () => {
         batch_number: row.batch_number,
         expiry_date: row.expiry_date,
         image_url: row.image_url,
-        is_active: Boolean(row.is_active),
+        is_active: row.is_active === 1 || row.is_active === "1" || row.is_active === true,
         tax_rate: row.tax_rate,
         category_name: row.category_name,
         category_color: row.category_color,
@@ -174,7 +175,7 @@ export const useProducts = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [onlyActive]); // Ajouter onlyActive comme dépendance
 
   return {
     products,

@@ -144,7 +144,7 @@ const StockManagement = () => {
     try {
       setLoading(true);
       const [productsRes, unitsRes] = await Promise.all([
-        fetch('/api/products'),
+        fetch('/api/products/active'), // Utiliser l'endpoint pour les produits actifs
         fetch('/api/units')
       ]);
       
@@ -153,7 +153,7 @@ const StockManagement = () => {
           productsRes.json(),
           unitsRes.json()
         ]);
-        setProducts(productsData);
+        setProducts(productsData); // Plus besoin de filtrer, l'API retourne déjà les produits actifs
         setUnits(unitsData);
       }
     } catch (error) {
