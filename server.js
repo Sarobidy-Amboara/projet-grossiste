@@ -510,17 +510,60 @@ app.delete('/api/units/:id', (req, res) => {
   try {
     const { id } = req.params;
     
-    const stmt = db.prepare('DELETE FROM unite WHERE id = ?');
-    const result = stmt.run(id);
+    // Vérifier si l'unité existe
+    const checkStmt = db.prepare('SELECT * FROM unite WHERE id = ?');
+    const unit = checkStmt.get(id);
     
-    if (result.changes === 0) {
+    if (!unit) {
       return res.status(404).json({ error: 'Unité non trouvée' });
     }
     
-    res.json({ message: 'Unité supprimée avec succès' });
+    // Désactiver temporairement les contraintes de clés étrangères
+    db.pragma('foreign_keys = OFF');
+    
+    // Utiliser une transaction pour les suppressions en cascade
+    const transaction = db.transaction(() => {
+      // Supprimer les conversions d'unités
+      const deleteConversions = db.prepare('DELETE FROM conversion_unite WHERE unite_id = ?');
+      deleteConversions.run(id);
+      
+      // Mettre à NULL les unités de base des produits
+      const updateProducts = db.prepare('UPDATE products SET unite_base_id = NULL WHERE unite_base_id = ?');
+      updateProducts.run(id);
+      
+      // Supprimer les mouvements de stock
+      const deleteStockMovements = db.prepare('DELETE FROM stock_movements WHERE unit_id = ?');
+      deleteStockMovements.run(id);
+      
+      // Supprimer les items d'achat
+      const deletePurchaseItems = db.prepare('DELETE FROM purchase_items WHERE unit_id = ?');
+      deletePurchaseItems.run(id);
+      
+      // Supprimer les prix par tiers qui pourraient référencer cette unité
+      const deletePriceTiers = db.prepare('DELETE FROM price_tiers WHERE unit_id = ?');
+      deletePriceTiers.run(id);
+      
+      // Maintenant supprimer l'unité
+      const deleteUnit = db.prepare('DELETE FROM unite WHERE id = ?');
+      const result = deleteUnit.run(id);
+      
+      if (result.changes === 0) {
+        throw new Error('Unité non trouvée pour suppression');
+      }
+    });
+    
+    // Exécuter la transaction
+    transaction();
+    
+    // Réactiver les contraintes de clés étrangères
+    db.pragma('foreign_keys = ON');
+    
+    res.json({ message: 'Unité supprimée avec succès (avec toutes ses dépendances)' });
   } catch (error) {
+    // S'assurer que les contraintes sont réactivées en cas d'erreur
+    db.pragma('foreign_keys = ON');
     console.error('Erreur lors de la suppression de l\'unité:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Erreur serveur: ' + error.message });
   }
 });
 
@@ -1837,29 +1880,29 @@ app.get('/api/dashboard/revenue-chart', (req, res) => {
     let params = [];
     
     if (startDate && endDate) {
-      dateFilter = 'WHERE DATE(sale_date) BETWEEN ? AND ? AND status = ?';
+      dateFilter = 'WHERE DATE(created_at) BETWEEN ? AND ? AND status = ?';
       params = [startDate, endDate, 'finalise'];
     } else {
       const days = parseInt(period);
-      dateFilter = 'WHERE DATE(sale_date) >= date("now", ?) AND status = ?';
+      dateFilter = 'WHERE DATE(created_at) >= date("now", ?) AND status = ?';
       params = [`-${days} days`, 'finalise'];
     }
     
     const revenueData = db.prepare(`
       SELECT 
-        DATE(sale_date) as date,
+        DATE(created_at) as date,
         COALESCE(SUM(final_amount), 0) as revenue,
         COUNT(*) as transactions
       FROM sales 
       ${dateFilter}
-      GROUP BY DATE(sale_date)
-      ORDER BY DATE(sale_date)
+      GROUP BY DATE(created_at)
+      ORDER BY DATE(created_at)
     `).all(...params);
     
     res.json(revenueData);
   } catch (error) {
     console.error('Erreur lors de la récupération des données de revenus:', error);
-    res.status(500).json({ error: 'Erreur serveur', details: error.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
