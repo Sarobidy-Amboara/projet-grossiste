@@ -71,11 +71,16 @@ interface StockMovement {
 }
 
 const StockManagement = () => {
+  // Recherche produit inventaire
+  const [productInvSearch, setProductInvSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [movementsLoading, setMovementsLoading] = useState(false);
+
+    // Recherche produit sortie manuelle
+    const [productOutSearch, setProductOutSearch] = useState("");
   
   // États pour sortie manuelle
   const [outModalOpen, setOutModalOpen] = useState(false);
@@ -408,22 +413,37 @@ const StockManagement = () => {
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="product-out">Produit *</Label>
-                  <Select value={selectedProductOut} onValueChange={setSelectedProductOut}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un produit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id.toString()}>
-                          {product.name} (Stock: {product.stock_quantity})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="product-out-search">Rechercher un produit</Label>
+                    <Input
+                      id="product-out-search"
+                      type="text"
+                      placeholder="Nom ou code-barres..."
+                      value={productOutSearch}
+                      onChange={e => setProductOutSearch(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="product-out">Produit *</Label>
+                    <Select value={selectedProductOut} onValueChange={setSelectedProductOut}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un produit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products
+                          .filter(product =>
+                            product.name.toLowerCase().includes(productOutSearch.toLowerCase())
+                            // Ajoutez ici d'autres critères si besoin (ex: code-barres)
+                          )
+                          .map((product) => (
+                            <SelectItem key={product.id} value={product.id.toString()}>
+                              {product.name} (Stock: {product.stock_quantity})
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -509,22 +529,36 @@ const StockManagement = () => {
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="product-inv">Produit *</Label>
-                  <Select value={selectedProductInv} onValueChange={setSelectedProductInv}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un produit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id.toString()}>
-                          {product.name} (Stock théorique: {product.stock_quantity})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="product-inv-search">Rechercher un produit</Label>
+                    <Input
+                      id="product-inv-search"
+                      type="text"
+                      placeholder="Nom ou code-barres..."
+                      value={productInvSearch}
+                      onChange={e => setProductInvSearch(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="product-inv">Produit *</Label>
+                    <Select value={selectedProductInv} onValueChange={setSelectedProductInv}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un produit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products
+                          .filter(product =>
+                            product.name.toLowerCase().includes(productInvSearch.toLowerCase())
+                          )
+                          .map((product) => (
+                            <SelectItem key={product.id} value={product.id.toString()}>
+                              {product.name} (Stock théorique: {product.stock_quantity})
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
